@@ -32,15 +32,19 @@ jobs:
       run: |
         python crawler.py
 
-    - name: Commit and Push results
+    - name: Commit Results (Excel & Error Log)
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 엑셀 파일과 디버그용 HTML 파일을 모두 추가
+        # 엑셀 파일 추가
         git add s2b_result.xlsx
-        git add debug_response.html
         
-        git commit -m "Update Data & Debug Info: $(date +'%Y-%m-%d')" || exit 0
+        # 에러 HTML 파일이 있다면 추가 (원인 분석용)
+        if [ -f s2b_error.html ]; then
+          git add s2b_error.html
+        fi
+        
+        git commit -m "Update S2B Data: $(date +'%Y-%m-%d')" || exit 0
         
         git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main

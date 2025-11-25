@@ -4,6 +4,8 @@ import pandas as pd
 import time
 import os
 import urllib3
+import traceback
+import re
 from datetime import datetime
 
 # SSL 경고 무시
@@ -12,38 +14,51 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ==========================================
 # 설정 구간
 # ==========================================
-URL = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
+URL_GET = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
+URL_POST = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
 START_DATE = "20240101"
 END_DATE = datetime.today().strftime("%Y%m%d")
 OUTPUT_FILE = "s2b_result.xlsx"
-DEBUG_HTML_FILE = "debug_response.html" # 서버 응답을 저장할 파일명
+ERROR_FILE = "s2b_error.html"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Referer": "https://www.s2b.kr/S2BNCustomer/tcmo001.do",
     "Origin": "https://www.s2b.kr",
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
 }
+
+def extract_alert_message(html_text):
+    """HTML 내의 자바스크립트 alert 메시지 추출"""
+    match = re.search(r"alert\(['\"](.*?)['\"]\)", html_text)
+    if match:
+        return match.group(1)
+    return "메시지 없음"
 
 def main():
     print(f"[{datetime.now()}] 크롤러 시작")
     session = requests.Session()
     
-    # 1. [중요] 최초 접속하여 세션(쿠키) 생성
-    print(" >> 1. 메인 페이지 접속하여 쿠키 획득 중...")
+    # 1. GET 요청으로 쿠키(JSESSIONID) 획득
+    print(" >> 1. 페이지 진입 (세션 획득)...")
     try:
-        session.get(URL, headers=HEADERS, verify=False, timeout=30)
+        res_get = session.get(URL_GET, headers=HEADERS, verify=False, timeout=30)
+        res_get.encoding = 'euc-kr'
+        print(f"    - 진입 응답 코드: {res_get.status_code}")
     except Exception as e:
-        print(f"접속 실패: {e}")
+        print(f"    - 접속 실패: {e}")
         return
 
-    # 2. 데이터 요청 (POST)
-    print(" >> 2. 검색 데이터 요청 중...")
+    time.sleep(2) # 사람이 접속한 척 딜레이
+
+    # 2. POST 요청 (검색)
+    print(" >> 2. 검색 데이터 요청 (POST)...")
     
-    # 한글 파라미터가 깨질 수 있으므로, 인코딩에 주의해야 함
-    # '전국' 같은 한글이 들어가면 EUC-KR 서버에서 에러가 날 수 있으므로
-    # 일단 지역 조건 없이 조회해봅니다.
+    # 중요: 한글이 포함되면 EUC-KR 서버에서 깨질 수 있으므로, 
+    # 지역(areaKind)이나 검색어 등은 일단 비워서 보냅니다.
     data = {
         'forwardName': 'list03',
         'pageNo': 1,
@@ -52,80 +67,80 @@ def main():
         'process_yn': 'Y',
         'search_yn': 'Y',
         'excelSection': 'N',
-        'tender_item': '',    # 전체
-        'estimate_kind': '',  # 전체
-        'areaKind': ''        # 전체 (한글 인코딩 문제 회피용)
+        # 아래 값들은 비워두거나 기본값 사용
+        'tender_item': '',    
+        'estimate_kind': '',  
+        'areaKind': ''        
     }
 
     try:
-        response = session.post(URL, data=data, headers=HEADERS, verify=False, timeout=30)
-        response.encoding = 'euc-kr' # 필수
+        response = session.post(URL_POST, data=data, headers=HEADERS, verify=False, timeout=30)
+        # S2B는 반드시 euc-kr
+        response.encoding = 'euc-kr'
         
-        # 3. [진단] 응답 내용을 파일로 저장 (눈으로 확인하기 위함)
-        print(f" >> 응답 코드: {response.status_code}")
-        with open(DEBUG_HTML_FILE, "w", encoding="utf-8") as f:
-            f.write(response.text)
-        print(f" >> [중요] 서버 응답 화면을 '{DEBUG_HTML_FILE}'로 저장했습니다.")
-
-        # 4. 파싱 시작
+        # 3. 결과 분석
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 테이블 찾기 로직 강화
+        # 테이블 찾기
         target_table = None
-        tables = soup.find_all('table')
-        for t in tables:
-            text = t.get_text()
-            if '계약명' in text and '계약번호' in text:
+        for t in soup.find_all('table'):
+            if '계약명' in t.get_text() and '계약번호' in t.get_text():
                 target_table = t
                 break
         
         if not target_table:
-            print(" >> ? 데이터 테이블을 찾지 못했습니다. (debug_response.html 파일을 확인하세요)")
-            # 빈 엑셀 생성 (에러 방지)
-            pd.DataFrame({'Status': ['데이터없음']}).to_excel(OUTPUT_FILE, index=False)
+            print("\n[!!!] 결과 테이블을 찾지 못했습니다.")
+            
+            # 에러 메시지 추출 시도
+            alert_msg = extract_alert_message(response.text)
+            print(f" >> S2B 반환 메시지(Alert): {alert_msg}")
+            
+            # HTML 파일로 저장 (GitHub에서 확인용)
+            with open(ERROR_FILE, "w", encoding="utf-8") as f:
+                f.write(f"<!-- S2B Alert: {alert_msg} -->\n")
+                f.write(response.text)
+            print(f" >> 현재 화면을 '{ERROR_FILE}'로 저장했습니다. GitHub 파일 목록에서 확인하세요.")
+            
+            # 빈 엑셀 생성 (Action 에러 방지)
+            pd.DataFrame({'Error': [alert_msg]}).to_excel(OUTPUT_FILE, index=False)
             return
 
-        print(" >> 테이블 발견! 데이터 추출 중...")
+        # 4. 데이터가 있다면 파싱
+        print(f" >> 테이블 발견! 데이터 추출 중...")
+        # ... (이전과 동일한 파싱 로직)
         processed_rows = []
         all_trs = target_table.find_all('tr')
-        
         i = 0
         while i < len(all_trs):
             tds = all_trs[i].find_all('td')
-            # No 컬럼이 있는 행만 처리
             if not tds or not tds[0].get_text(strip=True).isdigit():
                 i += 1
                 continue
-            
             if i + 1 >= len(all_trs): break
             tds2 = all_trs[i+1].find_all('td')
-            
             try:
                 item = {
                     'No': tds[0].get_text(strip=True),
-                    '계약구분': tds[1].get_text(strip=True),
-                    '계약번호': tds[2].get_text(strip=True),
                     '계약명': tds[3].get_text(strip=True),
                     '금액': tds[4].get_text(strip=True),
-                    '계약대상자': tds[5].get_text(strip=True),
                     '계약일': tds2[3].get_text(strip=True) if len(tds2) > 3 else ""
                 }
                 processed_rows.append(item)
-            except:
-                pass
+            except: pass
             i += 1
 
-        # 결과 저장
         if processed_rows:
-            print(f" >> ? 총 {len(processed_rows)}건 추출 성공!")
+            print(f" >> ? {len(processed_rows)}건 수집 성공")
             pd.DataFrame(processed_rows).to_excel(OUTPUT_FILE, index=False)
         else:
-            print(" >> ?? 테이블은 찾았으나 추출된 행이 없습니다.")
-            pd.DataFrame({'Status': ['행없음']}).to_excel(OUTPUT_FILE, index=False)
+            print(" >> 데이터 행 없음.")
+            pd.DataFrame({'Status': ['NoData']}).to_excel(OUTPUT_FILE, index=False)
 
     except Exception as e:
-        print(f"에러 발생: {e}")
+        print(f"Critical Error: {e}")
         traceback.print_exc()
+        # 에러 발생 시에도 빈 파일 생성
+        pd.DataFrame({'Error': ['ScriptError']}).to_excel(OUTPUT_FILE, index=False)
 
 if __name__ == "__main__":
     main()

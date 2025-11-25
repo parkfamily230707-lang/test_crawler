@@ -32,19 +32,15 @@ jobs:
       run: |
         python crawler.py
 
-    - name: Check and Push
+    - name: Commit and Push results
       run: |
-        # 파이썬에서 파일을 무조건 생성하므로 파일이 없으면 진짜 시스템 에러임
-        if [ ! -f s2b_result.xlsx ]; then
-          echo "Critical Error: 엑셀 파일 생성 실패"
-          exit 1
-        fi
-
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
+        # 엑셀 파일과 디버그용 HTML 파일을 모두 추가
         git add s2b_result.xlsx
-        git commit -m "Update Data: $(date +'%Y-%m-%d')" || exit 0
+        git add debug_response.html
         
-        # 128 에러 방지용 푸시
+        git commit -m "Update Data & Debug Info: $(date +'%Y-%m-%d')" || exit 0
+        
         git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main

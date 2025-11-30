@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 # 기본 조회 횟수
-DEFAULT_COUNT = 10000 
+DEFAULT_COUNT = 1000 
 
 def extract_s2b_info(estimate_code):
     """
@@ -239,7 +239,7 @@ def create_html_report(data_list, start_code, search_count):
         f.write(html_content)
         
     full_path = "file://" + os.path.realpath(file_name)
-    # 자동수행 주석
+    # 자동수행 주석---------------------------------------------------------------------------------------------------------------------------
     # webbrowser.open(full_path)
     print(f"\n? 결과 파일 생성 완료: {file_name}")
 

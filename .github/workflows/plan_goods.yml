@@ -1,4 +1,4 @@
-name: 내일 아침 확인할 파이썬 실행
+name: plan_goods
 
 # 언제 실행할지 결정하는 부분
 on:

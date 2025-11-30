@@ -48,6 +48,7 @@ jobs:
           *.xlsx
           *.txt
           *.log
+          *.html
           ./**/*.csv   # 하위 폴더에 있는 csv도 포함
           ./**/*.xlsx  # 하위 폴더에 있는 xlsx도 포함
         retention-days: 7 # 파일 보관 기간 (7일)

@@ -41,6 +41,10 @@ jobs:
         path: |
           *.csv
           *.xlsx
-          *.log
+          *.txt
           # 저장하고 싶은 파일 확장자나 폴더 경로를 적으세요
-        retention-days: 1 # 파일 보관 기간 (하루)
+        retention-days: 7 # 파일 보관 기간 (하루)
+
+
+
+

@@ -1,28 +1,46 @@
-name: Run Shell Script
+name: 내일 아침 확인할 파이썬 실행
 
-# 언제 실행할지 결정
+# 언제 실행할지 결정하는 부분
 on:
-  push:                # 코드가 업로드(push) 될 때 실행
-    branches: [ "main" ]
-  workflow_dispatch:   # [중요] 'Run workflow' 버튼을 눌러서 수동으로 실행 가능하게 함
+  workflow_dispatch:  # 'Run workflow' 버튼을 눌러 수동으로 실행 가능하게 함
 
 jobs:
-  build:
-    runs-on: ubuntu-latest  # 리눅스 환경 사용
+  run-my-script:
+    runs-on: ubuntu-latest  # GitHub이 제공하는 리눅스 컴퓨터 사용
 
     steps:
-    # 1. 내 코드를 가상 컴퓨터로 가져오기
+    # 1. 내 코드를 가져옴
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 파이썬 설치 (run.sh 안에서 파이썬을 쓴다면 필수)
+    # 2. 파이썬 설치 (버전 확인 필요, 보통 3.9 ~ 3.11 사용)
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # 원하는 버전
+        python-version: '3.10'
 
-    # 3. 권한 부여 및 스크립트 실행
-    - name: Run script
+    # 3. 필요한 라이브러리 설치
+    - name: Install dependencies
       run: |
-        chmod +x run.sh    # 실행 권한 부여 (필수!)
-        ./run.sh           # 스크립트 실행
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    # 4. 쉘 스크립트 실행 권한 부여 및 실행
+    - name: Run plan_goods_run.sh
+      run: |
+        chmod +x ./plan_goods_run.sh
+        ./plan_goods_run.sh
+
+    # 5. (선택사항) 결과 파일 저장하기
+    # 스크립트 실행 결과로 엑셀이나 CSV 파일이 생긴다면, 이걸 업로드해야 내일 다운로드 받을 수 있습니다.
+    - name: Upload result files
+      uses: actions/upload-artifact@v4
+      if: always()  # 에러가 나도 로그 파일 등을 건지기 위해 실행
+      with:
+        name: execution-results # 다운로드될 압축파일 이름
+        path: |
+          *.csv
+          *.xlsx
+          *.log
+          # 저장하고 싶은 파일 확장자나 폴더 경로를 적으세요
+        retention-days: 1 # 파일 보관 기간 (하루)

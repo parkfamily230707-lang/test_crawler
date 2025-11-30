@@ -1,0 +1,28 @@
+name: Run Shell Script
+
+# 언제 실행할지 결정
+on:
+  push:                # 코드가 업로드(push) 될 때 실행
+    branches: [ "main" ]
+  workflow_dispatch:   # [중요] 'Run workflow' 버튼을 눌러서 수동으로 실행 가능하게 함
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # 리눅스 환경 사용
+
+    steps:
+    # 1. 내 코드를 가상 컴퓨터로 가져오기
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. 파이썬 설치 (run.sh 안에서 파이썬을 쓴다면 필수)
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10' # 원하는 버전
+
+    # 3. 권한 부여 및 스크립트 실행
+    - name: Run script
+      run: |
+        chmod +x run.sh    # 실행 권한 부여 (필수!)
+        ./run.sh           # 스크립트 실행

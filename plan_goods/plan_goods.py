@@ -233,7 +233,7 @@ def create_html_report(data_list, start_code, search_count):
     </html>
     """
     
-    file_name = f"s2b_plan_{start_code}_{search_count}.html"
+    file_name = f"plan_goods_{start_code}_{search_count}.html"
     
     with open(file_name, "w", encoding="utf-8") as f:
         f.write(html_content)

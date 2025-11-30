@@ -19,11 +19,12 @@ jobs:
       with:
         python-version: '3.10'
 
-    # 3. 필요한 라이브러리 설치
+    # 3. 필요한 라이브러리 설치 (수정된 부분)
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas  # <--- 이 줄을 추가하세요! (requests랑 pandas 둘 다 설치)
+        # requests: 통신, pandas: 데이터, beautifulsoup4: bs4에러해결, openpyxl: 엑셀저장, lxml: 파싱
+        pip install requests pandas beautifulsoup4 openpyxl lxml
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     # 4. 쉘 스크립트 실행 권한 부여 및 실행
@@ -32,8 +33,11 @@ jobs:
         chmod +x ./plan_goods_run.sh
         ./plan_goods_run.sh
 
-    # 5. (선택사항) 결과 파일 저장하기
-    # 스크립트 실행 결과로 엑셀이나 CSV 파일이 생긴다면, 이걸 업로드해야 내일 다운로드 받을 수 있습니다.
+    # 5. 파일이 진짜 생겼는지 확인 (로그에서 확인용 - 디버깅)
+    - name: Check file existence
+      run: ls -R
+
+    # 6. 결과 파일 저장하기 (Artifact 업로드)
     - name: Upload result files
       uses: actions/upload-artifact@v4
       if: always()  # 에러가 나도 로그 파일 등을 건지기 위해 실행
@@ -43,9 +47,7 @@ jobs:
           *.csv
           *.xlsx
           *.txt
-          # 저장하고 싶은 파일 확장자나 폴더 경로를 적으세요
-        retention-days: 7 # 파일 보관 기간 (하루)
-
-
-
-
+          *.log
+          ./**/*.csv   # 하위 폴더에 있는 csv도 포함
+          ./**/*.xlsx  # 하위 폴더에 있는 xlsx도 포함
+        retention-days: 7 # 파일 보관 기간 (7일)

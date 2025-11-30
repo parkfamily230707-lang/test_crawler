@@ -27,4 +27,15 @@ python ./plan_goods/plan_goods.py 202511305571569 1000
 python ./plan_goods/plan_goods.py 202511305572569 1000
 python ./plan_goods/plan_goods.py 202511305573569 1000
 
+python ./plan_goods/plan_goods.py 202511305574569 1000
+python ./plan_goods/plan_goods.py 202511305575569 1000
+python ./plan_goods/plan_goods.py 202511305576569 1000
+python ./plan_goods/plan_goods.py 202511305577569 1000
+python ./plan_goods/plan_goods.py 202511305578569 1000
+python ./plan_goods/plan_goods.py 202511305579569 1000
+python ./plan_goods/plan_goods.py 202511305580569 1000
+python ./plan_goods/plan_goods.py 202511305581569 1000
+python ./plan_goods/plan_goods.py 202511305582569 1000
+python ./plan_goods/plan_goods.py 202511305583569 1000
+
 echo "작업끝"

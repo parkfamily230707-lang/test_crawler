@@ -4,143 +4,174 @@ import pandas as pd
 import time
 import os
 import urllib3
-import traceback
-import re
-from datetime import datetime
+import argparse
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
-# SSL 경고 무시
+# SSL 경고 숨기기
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
-# 설정 구간
+# [설정] 기본값 설정
 # ==========================================
-URL_GET = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
-URL_POST = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
-START_DATE = "20240101"
-END_DATE = datetime.today().strftime("%Y%m%d")
+DEFAULT_START_DATE = "20251124"
+DEFAULT_END_DATE = "20251124"
 OUTPUT_FILE = "s2b_result.xlsx"
-ERROR_FILE = "s2b_error.html"
+
+URL = "https://www.s2b.kr/S2BNCustomer/tcmo001.do"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Referer": "https://www.s2b.kr/S2BNCustomer/tcmo001.do",
     "Origin": "https://www.s2b.kr",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1"
+    "Content-Type": "application/x-www-form-urlencoded"
 }
 
-def extract_alert_message(html_text):
-    """HTML 내의 자바스크립트 alert 메시지 추출"""
-    match = re.search(r"alert\(['\"](.*?)['\"]\)", html_text)
-    if match:
-        return match.group(1)
-    return "메시지 없음"
+def get_data_for_period(session, start_str, end_str):
+    """특정 기간(3개월 이내)의 데이터를 페이지별로 수집"""
+    print(f" >> 조회 진행 중: {start_str} ~ {end_str}")
+    
+    period_data = []
+    page_no = 1
+    
+    while True:
+        data = {
+            'forwardName': 'list03',
+            'pageNo': page_no,
+            'tender_date_start': start_str,
+            'tender_date_end': end_str,
+            'process_yn': 'Y',
+            'search_yn': 'Y',
+            'excelSection': 'N',
+            'tender_item': '',
+            'estimate_kind': '',
+            'areaKind': ''
+        }
+        
+        try:
+            res = session.post(URL, data=data, headers=HEADERS, verify=False, timeout=30)
+            res.encoding = 'euc-kr'
+            
+            soup = BeautifulSoup(res.text, 'html.parser')
+            
+            # 테이블 찾기
+            target_table = None
+            for t in soup.find_all('table'):
+                if '계약명' in t.get_text() and '계약번호' in t.get_text():
+                    target_table = t
+                    break
+            
+            if not target_table:
+                break
+
+            # 데이터 파싱
+            rows_found = False
+            all_trs = target_table.find_all('tr')
+            
+            i = 0
+            while i < len(all_trs):
+                tds = all_trs[i].find_all('td')
+                
+                if not tds or not tds[0].get_text(strip=True).isdigit():
+                    i += 1
+                    continue
+                
+                rows_found = True
+                
+                if i + 1 >= len(all_trs): break
+                tds2 = all_trs[i+1].find_all('td')
+                
+                try:
+                    item = {
+                        'No': tds[0].get_text(strip=True),
+                        '계약구분': tds[1].get_text(strip=True),
+                        '계약번호': tds[2].get_text(strip=True),
+                        '계약명': tds[3].get_text(strip=True),
+                        '금액': tds[4].get_text(strip=True),
+                        '계약대상자': tds[5].get_text(strip=True),
+                        '기관명': tds2[1].get_text(strip=True) if len(tds2) > 1 else "",
+                        '계약일': tds2[3].get_text(strip=True) if len(tds2) > 3 else ""
+                    }
+                    period_data.append(item)
+                except:
+                    pass
+                
+                i += 1
+
+            if not rows_found:
+                break
+                
+            print(f"    └ 페이지 {page_no}: {len(period_data)}건 누적됨")
+            
+            # ====================================================
+            # [테스트용 코드] 3페이지까지만 수집하고 중단
+            # ====================================================
+            if page_no >= 3:
+                print("    ? [테스트 모드] 3페이지만 수집하고 다음 구간으로 넘어갑니다.")
+                break
+            # ====================================================
+            
+            page_no += 1
+            time.sleep(0.5) 
+            
+        except Exception as e:
+            print(f"    └ 통신 에러 발생: {e}")
+            break
+            
+    return period_data
 
 def main():
-    print(f"[{datetime.now()}] 크롤러 시작")
-    session = requests.Session()
+    parser = argparse.ArgumentParser(description='S2B Crawler')
+    parser.add_argument('--start', type=str, default=DEFAULT_START_DATE, help='시작일')
+    parser.add_argument('--end', type=str, default=DEFAULT_END_DATE, help='종료일')
+    args = parser.parse_args()
+
+    start_date_str = args.start
+    end_date_str = args.end
+
+    print("="*60)
+    print(f" S2B 학교장터 크롤러 (TEST MODE: Max 3 Pages)")
+    print(f" 대상 기간: {start_date_str} ~ {end_date_str}")
+    print("="*60)
     
-    # 1. GET 요청으로 쿠키(JSESSIONID) 획득
-    print(" >> 1. 페이지 진입 (세션 획득)...")
+    session = requests.Session()
     try:
-        res_get = session.get(URL_GET, headers=HEADERS, verify=False, timeout=30)
-        res_get.encoding = 'euc-kr'
-        print(f"    - 진입 응답 코드: {res_get.status_code}")
-    except Exception as e:
-        print(f"    - 접속 실패: {e}")
+        session.get(URL, headers=HEADERS, verify=False, timeout=20)
+    except:
+        print("? 서버 초기 접속 실패")
         return
 
-    time.sleep(2) # 사람이 접속한 척 딜레이
-
-    # 2. POST 요청 (검색)
-    print(" >> 2. 검색 데이터 요청 (POST)...")
+    all_results = []
     
-    # 중요: 한글이 포함되면 EUC-KR 서버에서 깨질 수 있으므로, 
-    # 지역(areaKind)이나 검색어 등은 일단 비워서 보냅니다.
-    data = {
-        'forwardName': 'list03',
-        'pageNo': 1,
-        'tender_date_start': START_DATE,
-        'tender_date_end': END_DATE,
-        'process_yn': 'Y',
-        'search_yn': 'Y',
-        'excelSection': 'N',
-        # 아래 값들은 비워두거나 기본값 사용
-        'tender_item': '',    
-        'estimate_kind': '',  
-        'areaKind': ''        
-    }
-
-    try:
-        response = session.post(URL_POST, data=data, headers=HEADERS, verify=False, timeout=30)
-        # S2B는 반드시 euc-kr
-        response.encoding = 'euc-kr'
-        
-        # 3. 결과 분석
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 테이블 찾기
-        target_table = None
-        for t in soup.find_all('table'):
-            if '계약명' in t.get_text() and '계약번호' in t.get_text():
-                target_table = t
-                break
-        
-        if not target_table:
-            print("\n[!!!] 결과 테이블을 찾지 못했습니다.")
+    curr_date = datetime.strptime(start_date_str, "%Y%m%d")
+    final_end_date = datetime.strptime(end_date_str, "%Y%m%d")
+    
+    while curr_date <= final_end_date:
+        next_date = curr_date + relativedelta(months=3) - timedelta(days=1)
+        if next_date > final_end_date:
+            next_date = final_end_date
             
-            # 에러 메시지 추출 시도
-            alert_msg = extract_alert_message(response.text)
-            print(f" >> S2B 반환 메시지(Alert): {alert_msg}")
-            
-            # HTML 파일로 저장 (GitHub에서 확인용)
-            with open(ERROR_FILE, "w", encoding="utf-8") as f:
-                f.write(f"<!-- S2B Alert: {alert_msg} -->\n")
-                f.write(response.text)
-            print(f" >> 현재 화면을 '{ERROR_FILE}'로 저장했습니다. GitHub 파일 목록에서 확인하세요.")
-            
-            # 빈 엑셀 생성 (Action 에러 방지)
-            pd.DataFrame({'Error': [alert_msg]}).to_excel(OUTPUT_FILE, index=False)
-            return
+        s_chunk = curr_date.strftime("%Y%m%d")
+        e_chunk = next_date.strftime("%Y%m%d")
+        
+        chunk_data = get_data_for_period(session, s_chunk, e_chunk)
+        all_results.extend(chunk_data)
+        
+        curr_date = next_date + timedelta(days=1)
+        if curr_date <= final_end_date:
+            time.sleep(1)
 
-        # 4. 데이터가 있다면 파싱
-        print(f" >> 테이블 발견! 데이터 추출 중...")
-        # ... (이전과 동일한 파싱 로직)
-        processed_rows = []
-        all_trs = target_table.find_all('tr')
-        i = 0
-        while i < len(all_trs):
-            tds = all_trs[i].find_all('td')
-            if not tds or not tds[0].get_text(strip=True).isdigit():
-                i += 1
-                continue
-            if i + 1 >= len(all_trs): break
-            tds2 = all_trs[i+1].find_all('td')
-            try:
-                item = {
-                    'No': tds[0].get_text(strip=True),
-                    '계약명': tds[3].get_text(strip=True),
-                    '금액': tds[4].get_text(strip=True),
-                    '계약일': tds2[3].get_text(strip=True) if len(tds2) > 3 else ""
-                }
-                processed_rows.append(item)
-            except: pass
-            i += 1
-
-        if processed_rows:
-            print(f" >> ? {len(processed_rows)}건 수집 성공")
-            pd.DataFrame(processed_rows).to_excel(OUTPUT_FILE, index=False)
-        else:
-            print(" >> 데이터 행 없음.")
-            pd.DataFrame({'Status': ['NoData']}).to_excel(OUTPUT_FILE, index=False)
-
-    except Exception as e:
-        print(f"Critical Error: {e}")
-        traceback.print_exc()
-        # 에러 발생 시에도 빈 파일 생성
-        pd.DataFrame({'Error': ['ScriptError']}).to_excel(OUTPUT_FILE, index=False)
+    print("="*60)
+    if all_results:
+        print(f" ? 총 {len(all_results)}건 수집 완료!")
+        try:
+            df = pd.DataFrame(all_results)
+            df.to_excel(OUTPUT_FILE, index=False)
+            print(f" ?? 파일 저장 완료: {os.path.abspath(OUTPUT_FILE)}")
+        except Exception as e:
+            print(f" ? 엑셀 저장 실패: {e}")
+    else:
+        print(" ?? 수집된 데이터가 없습니다.")
 
 if __name__ == "__main__":
     main()

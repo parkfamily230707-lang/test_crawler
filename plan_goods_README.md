@@ -16,3 +16,8 @@
     - 조회횟수 : count=5
 - .github/workflows/plan_goods.yaml
   - action파일
+
+
+## 결과물
+  - 결과물 : plan_goods_202511305555569_1000.html
+  - 로그 : plan_goods_202511305555569_1000_log.txt

@@ -5,7 +5,6 @@ set -e  # <--- 이 명령어를 추가하면 에러 발생 시 즉시 종료됨
 
 
 echo "작업시작"
-python ./plan_goods/plan_goods.py 202511305556569 1000
-python ./plan_goods/plan_goods.py 202511305557569 1000
+python ./plan_goods/plan_goods.py 202511305558569 1000
 
 echo "작업끝"

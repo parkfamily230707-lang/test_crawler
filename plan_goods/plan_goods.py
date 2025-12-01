@@ -8,6 +8,20 @@ from urllib.parse import urljoin
 # 기본 조회 횟수
 DEFAULT_COUNT = 10 
 
+# [추가됨] 화면 출력과 파일 저장을 동시에 수행하는 클래스
+class DualLogger:
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.log = open(filename, "w", encoding='utf-8')
+    
+    def write(self, message):
+        self.terminal.write(message) # 화면에 출력
+        self.log.write(message)      # 파일에 기록
+    
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
 def extract_s2b_info(estimate_code):
     """
     S2B 물품 상세 페이지에서 정보를 추출하는 함수
@@ -67,10 +81,10 @@ def extract_s2b_info(estimate_code):
             'error_msg': str(e)
         }
 
-def create_html_report(data_list, start_code, search_count):
+# [수정됨] 파일명을 외부에서 받도록 매개변수 추가 (file_name_to_save)
+def create_html_report(data_list, start_code, search_count, file_name_to_save):
     """
     HTML 파일 생성 함수
-    - 자바스크립트(JS)를 포함시켜 테이블 헤더 클릭 시 정렬 기능 추가
     """
     
     rows_html = ""
@@ -129,17 +143,16 @@ def create_html_report(data_list, start_code, search_count):
                 text-align: center;
                 vertical-align: middle;
             }}
-            /* 정렬 기능을 위한 헤더 스타일 변경 */
             th {{
                 background-color: #4a90e2;
                 color: white;
                 font-weight: bold;
                 padding: 15px 10px;
-                cursor: pointer; /* 마우스 오버 시 손가락 모양 */
-                user-select: none; /* 텍스트 선택 방지 */
+                cursor: pointer;
+                user-select: none;
             }}
             th:hover {{
-                background-color: #357abd; /* 마우스 오버 시 색상 변경 */
+                background-color: #357abd;
             }}
             .product-img {{
                 width: 127px;
@@ -172,7 +185,6 @@ def create_html_report(data_list, start_code, search_count):
             </colgroup>
             <thead>
                 <tr>
-                    <!-- 클릭 시 sortTable 함수 호출 (0번 컬럼부터 시작) -->
                     <th onclick="sortTable(0)">이미지 ?</th>
                     <th onclick="sortTable(1)">제목 ?</th>
                     <th onclick="sortTable(2)">카테고리 ?</th>
@@ -184,18 +196,16 @@ def create_html_report(data_list, start_code, search_count):
             </tbody>
         </table>
 
-        <!-- 테이블 정렬 스크립트 -->
         <script>
         function sortTable(n) {{
             var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
             table = document.getElementById("resultTable");
             switching = true;
-            dir = "asc"; // 초기 정렬 방향: 오름차순
+            dir = "asc"; 
 
             while (switching) {{
                 switching = false;
                 rows = table.rows;
-                // 헤더를 제외한 모든 행 반복
                 for (i = 1; i < (rows.length - 1); i++) {{
                     shouldSwitch = false;
                     x = rows[i].getElementsByTagName("TD")[n];
@@ -233,24 +243,19 @@ def create_html_report(data_list, start_code, search_count):
     </html>
     """
     
-    file_name = f"plan_goods_{start_code}_{search_count}.html"
-    
-    with open(file_name, "w", encoding="utf-8") as f:
+    # [수정됨] 외부에서 전달받은 file_name_to_save 사용
+    with open(file_name_to_save, "w", encoding="utf-8") as f:
         f.write(html_content)
         
-    full_path = "file://" + os.path.realpath(file_name)
-    # 자동수행 주석---------------------------------------------------------------------------------------------------------------------------
+    full_path = "file://" + os.path.realpath(file_name_to_save)
     # webbrowser.open(full_path)
-    print(f"\n? 결과 파일 생성 완료: {file_name}")
+    print(f"\n? 결과 파일 생성 완료: {file_name_to_save}")
 
 # --- 메인 실행부 ---
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("=" * 60)
         print("[경고] 조회할 시작 번호를 입력하지 않았습니다.")
-        print(f"사용법: python s2b_plan_goods.py [시작번호] [조회횟수(선택)]")
-        print(f"예  시: python s2b_plan_goods.py 202511295546579 50")
-        print("=" * 60)
         sys.exit(1)
 
     start_number_str = sys.argv[1]
@@ -263,7 +268,16 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         search_count = DEFAULT_COUNT
-        print(f"※ 조회 횟수를 입력하지 않아 기본값({DEFAULT_COUNT}회)으로 실행합니다.")
+    
+    # [중요] 파일 이름 생성 로직을 여기로 이동
+    base_file_name = f"plan_goods_{start_number_str}_{search_count}"
+    
+    html_file = f"{base_file_name}.html"
+    log_file  = f"{base_file_name}_log.txt"
+
+    # [중요] 표준 출력(print)을 가로채서 화면과 log 파일 양쪽에 기록하도록 설정
+    sys.stdout = DualLogger(log_file)
+    sys.stderr = sys.stdout # 에러 메시지도 로그 파일에 기록
 
     if not start_number_str.isdigit():
         print("오류: 시작 번호는 숫자만 입력해야 합니다.")
@@ -273,6 +287,7 @@ if __name__ == "__main__":
     all_results = []
     
     print(f"?? [{start_number_str}] 부터 {search_count}건 조회를 시작합니다...")
+    print(f"?? 로그 파일 저장: {log_file}")
     print("-" * 50)
 
     for i in range(search_count):
@@ -284,4 +299,5 @@ if __name__ == "__main__":
     print(f"\n{'-' * 50}")
     print("수집 완료! 결과 리포트를 생성합니다.")
     
-    create_html_report(all_results, start_number_str, search_count)
+    # 생성한 html_file 이름을 인자로 전달
+    create_html_report(all_results, start_number_str, search_count, html_file)

@@ -33,39 +33,47 @@ jobs:
         pip install requests pandas beautifulsoup4 openpyxl lxml
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # 4. 쉘 스크립트 실행 권한 부여 및 실행 (여기서 파일 내용이 변경됨)
+    # 4. 쉘 스크립트 실행
     - name: Run plan_goods_run.sh
       run: |
         chmod +x ./plan_goods_run.sh
         ./plan_goods_run.sh > log.txt 2>&1
 
-    # 5. 파일이 진짜 생겼는지 확인 (디버깅용)
+    # 5. 파일 생성 확인 (디버깅)
     - name: Check file existence
       run: ls -R
 
-    # [중요 2] 변경된 파라미터 파일을 GitHub 저장소에 반영(Commit & Push)
+    # [중요 2] 변경된 파라미터 및 결과 파일을 GitHub 저장소에 반영(Commit & Push)
     - name: Commit and Push changes
       run: |
-        # 1. 봇 계정 설정 (누가 커밋했는지 명시)
+        # 1. 봇 계정 설정
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 2. 변경된 파라미터 파일(plan_goods_param.txt)을 스테이징
+        # 2. 파일 스테이징 (Staging)
+        # (A) 파라미터 파일 추가
         git add plan_goods_param.txt
         
+        # (B) 결과 파일들 추가 (csv, xlsx)
+        # || true 는 파일이 없을 경우 에러가 나서 멈추는 것을 방지함
+        git add *.csv *.xlsx *.html || true
+        
+        # 하위 폴더에 생기는 경우도 포함하고 싶다면 아래 주석 해제하여 사용
+        # git add **/*.csv **/*.xlsx || true
+
         # 3. 변경 사항이 있는지 확인 후 커밋 및 푸시
         if ! git diff --cached --quiet; then
-          git commit -m "Auto-update parameters [skip ci]"
+          git commit -m "Update parameters and result files [skip ci]"
           git push
-          echo "Successfully updated plan_goods_param.txt"
+          echo "GitHub 저장소 파일 갱신 및 업로드 완료"
         else
-          echo "No changes detected in plan_goods_param.txt"
+          echo "변경 사항이 없어 커밋하지 않았습니다."
         fi
 
-    # 6. 결과 파일 저장하기 (Artifact 업로드)
+    # 6. 결과 파일 저장하기 (Artifact 업로드 - 다운로드용)
     - name: Upload result files
       uses: actions/upload-artifact@v4
-      if: always()  # 에러가 나도 로그 파일 등을 건지기 위해 실행
+      if: always()
       with:
         name: execution-results 
         path: |

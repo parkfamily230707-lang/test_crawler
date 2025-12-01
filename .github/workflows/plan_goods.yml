@@ -31,7 +31,7 @@ jobs:
     - name: Run plan_goods_run.sh
       run: |
         chmod +x ./plan_goods_run.sh
-        ./plan_goods_run.sh
+        ./plan_goods_run.sh > log.txt 2>&1
 
     # 5. 파일이 진짜 생겼는지 확인 (로그에서 확인용 - 디버깅)
     - name: Check file existence

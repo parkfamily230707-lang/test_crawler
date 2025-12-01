@@ -19,5 +19,5 @@ jobs:
         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
-          retain_days: 1         # 1일 지난 기록은 삭제 (원하는 기간으로 설정)
+          retain_days: 0         # 1일 지난 기록은 삭제 (원하는 기간으로 설정)
           keep_minimum_runs: 0   # 최소 최근 5개는 남겨둠 (실수 방지)

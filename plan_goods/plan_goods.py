@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 # 기본 조회 횟수
-DEFAULT_COUNT = 1000 
+DEFAULT_COUNT = 10 
 
 def extract_s2b_info(estimate_code):
     """

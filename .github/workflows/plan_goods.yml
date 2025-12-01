@@ -3,6 +3,13 @@ name: plan_goods
 # 언제 실행할지 결정하는 부분
 on:
   workflow_dispatch:  # 'Run workflow' 버튼을 눌러 수동으로 실행 가능하게 함
+  # 필요하다면 아래 주석을 풀어서 특정 시간(예: 매일 자정)에 자동 실행
+  # schedule:
+  #   - cron: '0 0 * * *'
+
+# [중요 1] 리포지토리 파일 수정(Push) 권한 부여
+permissions:
+  contents: write
 
 jobs:
   run-my-script:
@@ -13,42 +20,60 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 파이썬 설치 (버전 확인 필요, 보통 3.9 ~ 3.11 사용)
+    # 2. 파이썬 설치
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    # 3. 필요한 라이브러리 설치 (수정된 부분)
+    # 3. 필요한 라이브러리 설치
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # requests: 통신, pandas: 데이터, beautifulsoup4: bs4에러해결, openpyxl: 엑셀저장, lxml: 파싱
         pip install requests pandas beautifulsoup4 openpyxl lxml
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # 4. 쉘 스크립트 실행 권한 부여 및 실행
+    # 4. 쉘 스크립트 실행 권한 부여 및 실행 (여기서 파일 내용이 변경됨)
     - name: Run plan_goods_run.sh
       run: |
         chmod +x ./plan_goods_run.sh
         ./plan_goods_run.sh > log.txt 2>&1
 
-    # 5. 파일이 진짜 생겼는지 확인 (로그에서 확인용 - 디버깅)
+    # 5. 파일이 진짜 생겼는지 확인 (디버깅용)
     - name: Check file existence
       run: ls -R
+
+    # [중요 2] 변경된 파라미터 파일을 GitHub 저장소에 반영(Commit & Push)
+    - name: Commit and Push changes
+      run: |
+        # 1. 봇 계정 설정 (누가 커밋했는지 명시)
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 2. 변경된 파라미터 파일(plan_goods_param.txt)을 스테이징
+        git add plan_goods_param.txt
+        
+        # 3. 변경 사항이 있는지 확인 후 커밋 및 푸시
+        if ! git diff --cached --quiet; then
+          git commit -m "Auto-update parameters [skip ci]"
+          git push
+          echo "Successfully updated plan_goods_param.txt"
+        else
+          echo "No changes detected in plan_goods_param.txt"
+        fi
 
     # 6. 결과 파일 저장하기 (Artifact 업로드)
     - name: Upload result files
       uses: actions/upload-artifact@v4
       if: always()  # 에러가 나도 로그 파일 등을 건지기 위해 실행
       with:
-        name: execution-results # 다운로드될 압축파일 이름
+        name: execution-results 
         path: |
           *.csv
           *.xlsx
           *.txt
           *.log
           *.html
-          ./**/*.csv   # 하위 폴더에 있는 csv도 포함
-          ./**/*.xlsx  # 하위 폴더에 있는 xlsx도 포함
-        retention-days: 7 # 파일 보관 기간 (7일)
+          ./**/*.csv
+          ./**/*.xlsx
+        retention-days: 7

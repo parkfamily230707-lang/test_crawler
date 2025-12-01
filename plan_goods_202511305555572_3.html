@@ -1,0 +1,154 @@
+
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <title>S2B 결과 (202511305555572 외 2건)</title>
+        <style>
+            body { font-family: 'Malgun Gothic', 'Dotum', sans-serif; padding: 20px; background-color: #f9f9f9; }
+            h2 { color: #333; }
+            .info-text { margin-bottom: 10px; color: #666; }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background-color: #fff;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            }
+            th, td {
+                border: 1px solid #ccc;
+                padding: 10px;
+                text-align: center;
+                vertical-align: middle;
+            }
+            th {
+                background-color: #4a90e2;
+                color: white;
+                font-weight: bold;
+                padding: 15px 10px;
+                cursor: pointer;
+                user-select: none;
+            }
+            th:hover {
+                background-color: #357abd;
+            }
+            .product-img {
+                width: 127px;
+                height: 127px;
+                object-fit: contain;
+                display: block;
+                margin: 0 auto;
+                border: 1px solid #eee;
+            }
+            .text-left { text-align: left; padding-left: 20px; }
+            .no-data { color: #ccc; font-size: 0.9em; }
+            a { text-decoration: none; color: #1a0dab; font-weight: bold; }
+            a:hover { text-decoration: underline; }
+            tr:hover { background-color: #f1f1f1; }
+        </style>
+    </head>
+    <body>
+        <h2>?? S2B 물품 연속 조회 결과</h2>
+        <div class="info-text">
+            - 시작번호: <b>202511305555572</b><br>
+            - 조회개수: <b>3개</b><br>
+            <span style="font-size:0.9em; color:#888;">※ 테이블 헤더를 클릭하면 정렬할 수 있습니다.</span>
+        </div>
+        <table id="resultTable">
+            <colgroup>
+                <col width="150px" />
+                <col width="*" />
+                <col width="20%" />
+                <col width="20%" />
+            </colgroup>
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">이미지 ?</th>
+                    <th onclick="sortTable(1)">제목 ?</th>
+                    <th onclick="sortTable(2)">카테고리 ?</th>
+                    <th onclick="sortTable(3)">S2B등록번호 ?</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+            <tr>
+                <td><img src="http://www.s2b.kr:80/S2BNfiledata/remu_product/rema/2025/11/30/202511305555572_1764474921499.jpg" class="product-img"></td>
+                <td class="text-left">WS 보급형 점보롤 디스펜서</td>
+                <td>청소/생활 > 화장지/타올 > 디스펜서</td>
+                <td>
+                    <a href="https://www.s2b.kr/S2BNCustomer/rema100No.do?forwardName=detail&f_re_estimate_code=202511305555572" target="_blank" title="상세보기">
+                        202511305555572
+                    </a>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><img src="http://www.s2b.kr:80/S2BNfiledata/remu_product/rema/2025/11/30/202511305555573_1764474771208.jpg" class="product-img"></td>
+                <td class="text-left">캐논 정품잉크 CLI-751BK XL 검정</td>
+                <td>컴퓨터/전산용품 > 토너/잉크 > 잉크카트리지(정품)</td>
+                <td>
+                    <a href="https://www.s2b.kr/S2BNCustomer/rema100No.do?forwardName=detail&f_re_estimate_code=202511305555573" target="_blank" title="상세보기">
+                        202511305555573
+                    </a>
+                </td>
+            </tr>
+            
+            <tr>
+                <td><img src="http://www.s2b.kr:80/S2BNfiledata/remu_product/rema/2025/11/30/202511305555574_1764474204741.jpg" class="product-img"></td>
+                <td class="text-left">무드링크 데이오프 텀블러</td>
+                <td>청소/생활 > 생활잡화 > 기타생활잡화</td>
+                <td>
+                    <a href="https://www.s2b.kr/S2BNCustomer/rema100No.do?forwardName=detail&f_re_estimate_code=202511305555574" target="_blank" title="상세보기">
+                        202511305555574
+                    </a>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+
+        <script>
+        function sortTable(n) {
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById("resultTable");
+            switching = true;
+            dir = "asc"; 
+
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[n];
+                    y = rows[i + 1].getElementsByTagName("TD")[n];
+
+                    var xContent = x.innerText.toLowerCase();
+                    var yContent = y.innerText.toLowerCase();
+
+                    if (dir == "asc") {
+                        if (xContent > yContent) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else if (dir == "desc") {
+                        if (xContent < yContent) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount == 0 && dir == "asc") {
+                        dir = "desc";
+                        switching = true;
+                    }
+                }
+            }
+        }
+        </script>
+    </body>
+    </html>
+    

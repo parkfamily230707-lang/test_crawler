@@ -9,7 +9,7 @@ on:
 # 2. 권한 설정
 permissions:
   contents: write # Git Push를 위해 필요
-  actions: write  # 현재 실행 중인 워크플로우를 취소(Skip)하기 위해 필요
+  actions: write  # 실행 취소(gh run cancel)를 위해 필요
 
 jobs:
   run-my-script:
@@ -17,23 +17,25 @@ jobs:
 
     steps:
     # ----------------------------------------------------------------
-    # [중요] 중복 실행 방지 (Skip Logic)
-    # 이미 실행 중인 프로세스가 있으면, 이번(새로운) 실행을 즉시 취소합니다.
+    # [수정됨] 중복 실행 방지 (Skip Logic)
+    # Checkout 전이므로 --repo 옵션을 통해 명시적으로 리포지토리 지정
     # ----------------------------------------------------------------
     - name: Check for running workflow
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        # 현재 'plan_goods' 워크플로우 중 '진행 중(in_progress)'인 작업 수 확인
-        RUNNING_COUNT=$(gh run list --workflow "plan_goods" --status in_progress --json databaseId -q ". | length")
+        echo "?? 현재 실행 중인 작업 확인 중..."
+        
+        # 현재 리포지토리에서 'plan_goods' 워크플로우 중 '진행 중'인 것 카운트
+        RUNNING_COUNT=$(gh run list --repo ${{ github.repository }} --workflow "plan_goods" --status in_progress --json databaseId -q ". | length")
         
         echo "현재 실행 중인 프로세스 수: $RUNNING_COUNT"
         
         # 1개(자기 자신)보다 많으면 이전 작업이 아직 안 끝난 것임
         if [ "$RUNNING_COUNT" -gt 1 ]; then
           echo "? 이미 실행 중인 작업이 있습니다. 충돌 방지를 위해 이번 실행을 즉시 종료합니다."
-          gh run cancel ${{ github.run_id }}
-          sleep 60 # 취소 명령이 처리될 때까지 대기
+          gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+          sleep 60 # 취소 명령 처리 대기
         else
           echo "? 실행 중인 다른 작업이 없습니다. 작업을 시작합니다."
         fi
@@ -63,24 +65,29 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     # ----------------------------------------------------------------
-    # 4. 쉘 스크립트 실행 (여기서 파일 생성 및 파라미터 갱신 발생)
+    # 4. 쉘 스크립트 실행 (화면 출력 + 파일 저장 동시에)
     # ----------------------------------------------------------------
     - name: Run plan_goods_run.sh
       run: |
         chmod +x ./plan_goods_run.sh
-        # 실행 로그를 log.txt에 저장하면서 실행
-        ./plan_goods_run.sh > log.txt 2>&1
+        
+        # [중요] 2>&1 | tee log.txt : 에러를 화면에도 보여주고, 파일에도 저장함
+        ./plan_goods_run.sh 2>&1 | tee log.txt
 
     # ----------------------------------------------------------------
-    # 5. [디버깅] 생성된 파일 위치 확인
+    # 5. [디버깅] 생성된 파일 확인
     # ----------------------------------------------------------------
     - name: Check generated files
       run: |
-        echo "=== HTML 파일 위치 검색 ==="
+        echo "=== 생성된 HTML 파일 확인 ==="
         find . -name "*.html"
-        echo "==========================="
-        echo "=== 현재 폴더 구조 확인 ==="
-        ls -R
+        echo "============================="
+        
+        # 만약 에러 로그가 있다면 출력
+        if grep -q "Error" log.txt; then
+          echo "?? 로그 파일에서 'Error'가 발견되었습니다:"
+          grep "Error" log.txt
+        fi
 
     # ----------------------------------------------------------------
     # 6. [핵심] 변경된 모든 파일(HTML 포함)을 GitHub 저장소에 반영
@@ -91,7 +98,7 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
-        # (2) 모든 변경 사항 스테이징 (하위 폴더 포함)
+        # (2) 모든 변경 사항 스테이징
         git add .
         
         # (3) 변경 사항 확인 및 커밋/푸시
@@ -117,4 +124,4 @@ jobs:
           **/*.html
           **/*.txt
           **/*.log
-        retention-days: 1
+        retention-days: 7

@@ -1,2 +1,2 @@
 goods_num=202512035616816
-count=3
+count=500

@@ -1,21 +1,43 @@
 name: plan_goods
 
-# 1. 언제 실행할지 결정 
+# 1. 언제 실행할지 결정
 on:
   workflow_dispatch:  # 버튼을 눌러 수동 실행
-  # 매일 자정 자동 실행 (필요시 주석 해제)
-  # schedule:
-  #   - cron: '0 0 * * *'
+  schedule:
+    - cron: '*/5 * * * *'  # 5분마다 자동 실행
 
-# 2. [필수] 리포지토리 파일 수정(Push) 권한 부여
+# 2. 권한 설정
 permissions:
-  contents: write
+  contents: write # Git Push를 위해 필요
+  actions: write  # 현재 실행 중인 워크플로우를 취소(Skip)하기 위해 필요
 
 jobs:
   run-my-script:
     runs-on: ubuntu-latest  # 리눅스 환경 사용
 
     steps:
+    # ----------------------------------------------------------------
+    # [중요] 중복 실행 방지 (Skip Logic)
+    # 이미 실행 중인 프로세스가 있으면, 이번(새로운) 실행을 즉시 취소합니다.
+    # ----------------------------------------------------------------
+    - name: Check for running workflow
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # 현재 'plan_goods' 워크플로우 중 '진행 중(in_progress)'인 작업 수 확인
+        RUNNING_COUNT=$(gh run list --workflow "plan_goods" --status in_progress --json databaseId -q ". | length")
+        
+        echo "현재 실행 중인 프로세스 수: $RUNNING_COUNT"
+        
+        # 1개(자기 자신)보다 많으면 이전 작업이 아직 안 끝난 것임
+        if [ "$RUNNING_COUNT" -gt 1 ]; then
+          echo "? 이미 실행 중인 작업이 있습니다. 충돌 방지를 위해 이번 실행을 즉시 종료합니다."
+          gh run cancel ${{ github.run_id }}
+          sleep 60 # 취소 명령이 처리될 때까지 대기
+        else
+          echo "? 실행 중인 다른 작업이 없습니다. 작업을 시작합니다."
+        fi
+
     # ----------------------------------------------------------------
     # 1. 코드 체크아웃
     # ----------------------------------------------------------------
@@ -70,14 +92,13 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         
         # (2) 모든 변경 사항 스테이징 (하위 폴더 포함)
-        # 'git add .' 은 현재 위치 아래의 모든 변경된 파일을 담습니다.
         git add .
         
         # (3) 변경 사항 확인 및 커밋/푸시
         if ! git diff --cached --quiet; then
           git commit -m "Update parameters and result files (html/xlsx) [skip ci]"
           git push
-          echo "? GitHub 저장소 업로드 완료"
+          echo "?? GitHub 저장소 업로드 완료"
         else
           echo "?? 변경 사항이 없어 커밋하지 않았습니다."
         fi
@@ -96,4 +117,4 @@ jobs:
           **/*.html
           **/*.txt
           **/*.log
-        retention-days: 7
+        retention-days: 1

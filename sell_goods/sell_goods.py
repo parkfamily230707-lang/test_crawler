@@ -64,7 +64,7 @@ def get_real_browser_headers():
 
 def fetch_page_data(session, date_str, page_no):
     """특정 페이지 데이터를 수집하고 날짜 검증"""
-    time.sleep(random.uniform(10.0, 20.0))
+    time.sleep(random.uniform(3.0, 20.0))
     data = {
         'forwardName': 'list03',
         'pageNo': str(page_no),

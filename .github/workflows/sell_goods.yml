@@ -1,0 +1,58 @@
+name: sell_goods
+
+on:
+  schedule:
+    # GitHub Actions의 최소 단위는 5분이지만, 최대한 빈번하게 트리거되도록 설정
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # 수동 실행 버튼
+
+# 동일한 그룹에서 이미 실행 중인 작업이 있으면 신규 작업은 대기하거나 관리함
+concurrency:
+  group: sell_goods
+  # true로 설정하면 새 작업이 시작될 때 '기존' 작업을 죽입니다.
+  # false로 설정하면 '기존' 작업이 끝날 때까지 '새' 작업이 실행되지 않습니다. (데이터 꼬임 방지)
+  cancel-in-progress: false 
+
+jobs:
+  run-crawler:
+    runs-on: ubuntu-latest
+    # 이미 같은 그룹의 작업이 수행 중이면 이 작업은 건너뛰도록 처리
+    # (GitHub Actions는 기본적으로 큐에 쌓으려 하므로, 아래와 같이 타임아웃을 짧게 주거나 
+    # 현재 실행 중인 워크플로우를 체크하는 로직을 넣을 수 있습니다.)
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 pandas openpyxl
+
+      - name: Run S2B Crawler
+        run: |
+          # 하위 폴더로 이동 후 실행하여 파일 경로 꼬임 방지
+          cd sell_goods
+          python sell_goods.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 하위 폴더 내의 변경된 파라미터와 결과 파일들 추가
+          git add sell_goods/sell_goods_param.txt *.xlsx *.log
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Auto Update: S2B Data & Params [$(date +'%Y-%m-%d %H:%M')]"
+            git push
+          else
+            echo "변경사항이 없어 커밋을 건너뜜"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

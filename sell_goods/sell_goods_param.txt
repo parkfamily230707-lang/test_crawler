@@ -1,2 +1,2 @@
-search_day=20251005
+search_day=20251006
 page=1

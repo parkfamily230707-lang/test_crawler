@@ -64,11 +64,7 @@ def get_real_browser_headers():
 
 def fetch_page_data(session, date_str, page_no):
     """특정 페이지 데이터를 수집하고 날짜 검증"""
-    # [수정] 매 페이지 요청 사이 대기 시간을 30~70초로 변경
-    wait_time = random.uniform(30.0, 70.0)
-    log(f"    ... 서버 보호를 위해 {wait_time:.1f}초 대기 중 ...")
-    time.sleep(wait_time)
-    
+    time.sleep(random.uniform(10.0, 20.0))
     data = {
         'forwardName': 'list03',
         'pageNo': str(page_no),
@@ -157,11 +153,13 @@ def main():
         print(f"파라미터 읽기 오류: {e}")
         return
     
+    # [방어] 오늘 날짜면 실행 안 함
     today_str = datetime.now().strftime("%Y%m%d")
     if target_date == today_str:
         print(f" [중단] {target_date}는 오늘 날짜이므로 수집하지 않습니다.")
         return
 
+    # [수정] 파일명 규칙: s2b_result_날짜_시작페이지.xlsx
     output_xlsx = os.path.join(BASE_DIR, f"s2b_result_{target_date}_{start_page}.xlsx")
     output_log = os.path.join(BASE_DIR, f"s2b_result_{target_date}_{start_page}.log")
 
@@ -170,11 +168,12 @@ def main():
     except: pass
 
     log("="*60)
-    log(f" [시작] S2B 정밀 크롤러 (안전 모드: 30-70초 대기)")
+    log(f" [시작] S2B 정밀 크롤러")
     log(f" 대상 날짜: {target_date} / 시작 페이지: {start_page}")
     log(f" 저장 파일: {os.path.basename(output_xlsx)}")
     log("="*60)
     
+    # 기존 데이터 불러오기 (이어쓰기 보장)
     all_results = []
     if os.path.exists(output_xlsx):
         try:
@@ -191,11 +190,13 @@ def main():
             log(f" >> [요청] {current_page}페이지...")
             items, is_continue = fetch_page_data(session, target_date, current_page)
             
+            # 수집 데이터가 있다면 리스트에 추가하고 엑셀 저장
             if items:
                 all_results.extend(items)
                 log(f"    └ {len(items)}건 수집됨 (누적 {len(all_results)}건)")
                 pd.DataFrame(all_results).to_excel(output_xlsx, index=False)
             
+            # 날짜가 바뀌었을 때 (+1일 갱신 및 종료)
             if is_continue is False:
                 log(f" !! 날짜 경계 도달. {target_date} 수집 완료.")
                 curr_dt = datetime.strptime(target_date, "%Y%m%d")
@@ -203,26 +204,28 @@ def main():
                 update_param_file(new_date, 1)
                 break
 
+            # 통신 에러 시 (현재 페이지 보존)
             if items is None:
                 update_param_file(target_date, current_page)
                 break
             
+            # 더 이상 데이터가 없을 때
             if len(items) == 0:
                 log("    ? 더 이상 수집할 데이터가 없습니다.")
                 break
 
+            # 한 페이지 성공 시마다 다음 페이지 번호 기록
             update_param_file(target_date, current_page + 1)
             current_page += 1
             request_count += 1
             
-            # 추가 휴식 로직 (이미 기본 대기가 길기 때문에 필요에 따라 조정 가능)
+            # 과부하 방지 휴식
             if request_count % LONG_PAUSE_INTERVAL == 0:
-                log("    ... 장기 휴식 모드 (90-120초) ...")
-                time.sleep(random.uniform(90, 120))
+                time.sleep(random.uniform(60, 90))
                 session = requests.Session()
             elif request_count % RENEW_INTERVAL == 0:
                 session = requests.Session()
-                time.sleep(random.uniform(10, 20))
+                time.sleep(random.uniform(5, 8))
 
     except Exception as e:
         log(f" [에러] {e}")
